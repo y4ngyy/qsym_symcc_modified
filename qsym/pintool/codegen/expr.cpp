@@ -163,7 +163,7 @@ Expr::Expr(Kind kind, UINT32 bits)
   , kind_(kind)
   , bits_(bits)
   , children_()
-  , context_(g_z3_context)
+  , context_(*g_z3_context)
   , expr_(NULL)
   , hash_(NULL)
   , range_sets{}

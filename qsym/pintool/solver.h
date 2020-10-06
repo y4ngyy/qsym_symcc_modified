@@ -17,7 +17,7 @@
 
 namespace qsym {
 
-extern z3::context g_z3_context;
+extern z3::context *g_z3_context;
 typedef std::unordered_set<ExprRef, ExprRefHash, ExprRefEqual> ExprRefSetTy;
 
 class Solver {
