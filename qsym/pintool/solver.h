@@ -29,6 +29,7 @@ public:
       const std::string input_file,
       const std::string out_dir,
       const std::string bitmap);
+  virtual ~Solver() = default;
 
   void push();
   void reset();
@@ -67,7 +68,7 @@ protected:
   void readInput();
 
   std::vector<UINT8> getConcreteValues();
-  void saveValues(const std::string& postfix);
+  virtual void saveValues(const std::string& postfix);
   void printValues(const std::vector<UINT8>& values);
 
   z3::expr getPossibleValue(z3::expr& z3_expr);
