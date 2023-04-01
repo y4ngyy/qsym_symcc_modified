@@ -127,9 +127,9 @@ void Solver::add(z3::expr expr) {
 z3::check_result Solver::check() {
   uint64_t before = getTimeStamp();
   z3::check_result res;
-  LOG_STAT(
-      "SMT: { \"solving_time\": " + decstr(solving_time_) + ", "
-      + "\"total_time\": " + decstr(before - start_time_) + " }\n");
+  // LOG_STAT(
+  //     "SMT: { \"solving_time\": " + decstr(solving_time_) + ", "
+  //     + "\"total_time\": " + decstr(before - start_time_) + " }\n");
   // LOG_DEBUG("Constraints: " + solver_.to_smt2() + "\n");
   try {
     res = solver_.check();
@@ -142,7 +142,7 @@ z3::check_result Solver::check() {
   uint64_t cur = getTimeStamp();
   uint64_t elapsed = cur - before;
   solving_time_ += elapsed;
-  LOG_STAT("SMT: { \"solving_time\": " + decstr(solving_time_) + " }\n");
+  // LOG_STAT("SMT: { \"solving_time\": " + decstr(solving_time_) + " }\n");
   return res;
 }
 
@@ -157,6 +157,7 @@ bool Solver::checkAndSave(const std::string& postfix) {
   }
 }
 
+#ifndef WITH_SANITIZER_RUNTIME
 void Solver::addJcc(ExprRef e, bool taken, ADDRINT pc) {
   // Save the last instruction pointer for debugging
   last_pc_ = pc;
@@ -186,6 +187,33 @@ void Solver::addJcc(ExprRef e, bool taken, ADDRINT pc) {
     negatePath(e, taken);
   addConstraint(e, taken, is_interesting);
 }
+
+#else
+void Solver::addJcc(ExprRef e, bool taken, ADDRINT pc, bool is_interesting, bool is_memcpy) {
+  // Save the last instruction pointer for debugging
+  last_pc_ = pc;
+
+  if (e->isConcrete())
+    return;
+
+  // if e == Bool(true), then ignore
+  if (e->kind() == Bool) {
+    assert(!(castAs<BoolExpr>(e)->value()  ^ taken));
+    return;
+  }
+
+  assert(isRelational(e.get()));
+
+  // check duplication before really solving something,
+  // some can be handled by range based constraint solving
+
+  if (is_interesting) {
+    negatePath(e, taken, is_memcpy);
+  } else {
+    addConstraint(e, taken, is_interesting);
+  }
+}
+#endif
 
 void Solver::addAddr(ExprRef e, ADDRINT addr) {
   llvm::APInt v(e->bits(), addr);
@@ -508,6 +536,47 @@ ExprRef Solver::getRangeConstraint(ExprRef e, bool is_unsigned) {
 }
 
 
+#include <execinfo.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+static void full_write(int fd, const char *buf, size_t len)
+{
+        while (len > 0) {
+                ssize_t ret = write(fd, buf, len);
+
+                if ((ret == -1) && (errno != EINTR))
+                        break;
+
+                buf += (size_t) ret;
+                len -= (size_t) ret;
+        }
+}
+
+void print_backtrace(void)
+{
+        static const char start[] = "BACKTRACE ------------\n";
+        static const char end[] = "----------------------\n";
+
+        void *bt[1024];
+        int bt_size;
+        char **bt_syms;
+        int i;
+
+        bt_size = backtrace(bt, 1024);
+        bt_syms = backtrace_symbols(bt, bt_size);
+        full_write(STDERR_FILENO, start, strlen(start));
+        for (i = 1; i < bt_size; i++) {
+                size_t len = strlen(bt_syms[i]);
+                full_write(STDERR_FILENO, bt_syms[i], len);
+                full_write(STDERR_FILENO, "\n", 1);
+        }
+        full_write(STDERR_FILENO, end, strlen(end));
+    free(bt_syms);
+}
+
 bool Solver::isInterestingJcc(ExprRef rel_expr, bool taken, ADDRINT pc) {
   bool interesting = trace_.isInterestingBranch(pc, taken);
   // record for other decision
@@ -515,17 +584,29 @@ bool Solver::isInterestingJcc(ExprRef rel_expr, bool taken, ADDRINT pc) {
   return interesting;
 }
 
-void Solver::negatePath(ExprRef e, bool taken) {
+void Solver::negatePath(ExprRef e, bool taken,  bool is_memcpy) {
   reset();
   syncConstraints(e);
   addToSolver(e, !taken);
   bool sat = checkAndSave();
+  if (sat || is_memcpy) {
+    // if (sat && is_memcpy) {
+    //   std::cerr << "memcpy sat\n";
+    // } else if (sat) {
+    //   std:cerr << "normal sat\n";
+    // }
+    // print_backtrace();
+    // std::cerr << Z3_solver_to_string(*g_z3_context, solver_) << endl;
+    // std::cerr << e->toString() << "\n";
+  }
+#ifndef WITH_SANITIZER_RUNTIME
   if (!sat) {
     reset();
     // optimistic solving
     addToSolver(e, !taken);
     checkAndSave("optimistic");
   }
+#endif
 }
 
 void Solver::solveOne(z3::expr z3_expr) {

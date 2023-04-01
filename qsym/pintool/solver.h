@@ -14,6 +14,7 @@
 // #include "thread_context.h"
 #include "expr_builder.h"
 #include "dependency.h"
+#include "config.h"
 
 namespace qsym {
 
@@ -38,7 +39,11 @@ public:
   z3::check_result check();
 
   bool checkAndSave(const std::string& postfix="");
+#ifndef WITH_SANITIZER_RUNTIME
   void addJcc(ExprRef, bool, ADDRINT);
+#else
+  void addJcc(ExprRef, bool, ADDRINT, bool, bool is_memcpy=false);
+#endif
   void addAddr(ExprRef, ADDRINT);
   void addAddr(ExprRef, llvm::APInt);
   void addValue(ExprRef, ADDRINT);
@@ -86,7 +91,7 @@ protected:
   ExprRef getRangeConstraint(ExprRef e, bool is_unsigned);
 
   bool isInterestingJcc(ExprRef, bool, ADDRINT);
-  void negatePath(ExprRef, bool);
+  void negatePath(ExprRef, bool,  bool is_memcpy=false);
   void solveOne(z3::expr);
 
   void checkFeasible();
