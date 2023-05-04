@@ -42,7 +42,7 @@ public:
 #ifndef WITH_SANITIZER_RUNTIME
   void addJcc(ExprRef, bool, ADDRINT);
 #else
-  void addJcc(ExprRef, bool, ADDRINT, bool, bool is_memcpy=false);
+  void addJcc(ExprRef, bool, ADDRINT, bool);
 #endif
   void addAddr(ExprRef, ADDRINT);
   void addAddr(ExprRef, llvm::APInt);
@@ -91,7 +91,7 @@ protected:
   ExprRef getRangeConstraint(ExprRef e, bool is_unsigned);
 
   bool isInterestingJcc(ExprRef, bool, ADDRINT);
-  void negatePath(ExprRef, bool,  bool is_memcpy=false);
+  void negatePath(ExprRef, bool);
   void solveOne(z3::expr);
 
   void checkFeasible();

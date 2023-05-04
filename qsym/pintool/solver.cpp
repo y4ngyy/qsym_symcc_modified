@@ -189,7 +189,7 @@ void Solver::addJcc(ExprRef e, bool taken, ADDRINT pc) {
 }
 
 #else
-void Solver::addJcc(ExprRef e, bool taken, ADDRINT pc, bool is_interesting, bool is_memcpy) {
+void Solver::addJcc(ExprRef e, bool taken, ADDRINT pc, bool is_interesting) {
   // Save the last instruction pointer for debugging
   last_pc_ = pc;
 
@@ -208,7 +208,7 @@ void Solver::addJcc(ExprRef e, bool taken, ADDRINT pc, bool is_interesting, bool
   // some can be handled by range based constraint solving
 
   if (is_interesting) {
-    negatePath(e, taken, is_memcpy);
+    negatePath(e, taken);
   } else {
     addConstraint(e, taken, is_interesting);
   }
@@ -584,21 +584,21 @@ bool Solver::isInterestingJcc(ExprRef rel_expr, bool taken, ADDRINT pc) {
   return interesting;
 }
 
-void Solver::negatePath(ExprRef e, bool taken,  bool is_memcpy) {
+void Solver::negatePath(ExprRef e, bool taken) {
   reset();
   syncConstraints(e);
   addToSolver(e, !taken);
   bool sat = checkAndSave();
-  if (sat || is_memcpy) {
-    // if (sat && is_memcpy) {
-    //   std::cerr << "memcpy sat\n";
-    // } else if (sat) {
-    //   std:cerr << "normal sat\n";
-    // }
-    // print_backtrace();
-    // std::cerr << Z3_solver_to_string(*g_z3_context, solver_) << endl;
-    // std::cerr << e->toString() << "\n";
-  }
+  // if (sat) {
+  //   // if (sat && is_memcpy) {
+  //   //   std::cerr << "memcpy sat\n";
+  //   // } else if (sat) {
+  //   //   std:cerr << "normal sat\n";
+  //   // }
+  //   // print_backtrace();
+  //   // std::cerr << Z3_solver_to_string(*g_z3_context, solver_) << endl;
+  //   // std::cerr << e->toString() << "\n";
+  // }
 #ifndef WITH_SANITIZER_RUNTIME
   if (!sat) {
     reset();
